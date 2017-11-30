@@ -21,3 +21,6 @@ class Line(object):
 
     def get_coords(self):
         return self.point0.x, self.point0.y, self.point1.x, self.point1.y
+
+    def get_coords_arr(self):
+        return [int(self.point0.x), int(self.point0.y), self.point1.x, self.point1.y]

@@ -1,4 +1,6 @@
 from tkinter import *
+import glob
+import csv
 from PIL import ImageTk, Image
 from Line import Line, Point
 import pickle
@@ -7,13 +9,17 @@ import os
 
 class DrawingArea(object):
     """docstring for DrawingArea."""
-    def __init__(self, root, image_ind=0, max_image_ind=5, lines={}):
+    def __init__(self, root, image_ind=0, max_image_ind=5):
         super(DrawingArea, self).__init__()
         self.current = None
         self.image_ind = image_ind
-        self.max_image_ind = 5
+        self.min_image_ind = image_ind
+        self.max_image_ind = max_image_ind
+        self.bottom = False
 
-        self.lines = lines #list of lines
+        self.lines = {}
+        self.load_lines_from_csv()
+
         self.line_buffer = {}
 
         #Image Label
@@ -25,6 +31,12 @@ class DrawingArea(object):
         self.left_button.pack(side=LEFT)
         self.right_button = Button(root, text="Next Picture ->", command=self.next_image)
         self.right_button.pack(side=RIGHT)
+
+        self.bottom_checkbox = Checkbutton(root, text="Bottom Image", variable=self.bottom, command=self.update_bottom)
+        self.bottom_checkbox.pack(side=BOTTOM)
+
+        self.save_lines_csv = Button(root, text="Save Lines to File", command=self.save_to_csv)
+        self.save_lines_csv.pack(side=BOTTOM)
 
         #Undo Last Line Removed
         self.undo_remove = Button(root, text="Undo Remove Line", command=self.undo_remove_line)
@@ -42,10 +54,8 @@ class DrawingArea(object):
         self.bind_controls()
 
     def load_image(self, image_ind=None):
-        if image_ind is None:
-            image_ind = self.image_ind
 
-        image_path = 'imgs/image'+str(image_ind)+'.jpg'
+        image_path = self.get_image_name(image_ind, path=True)
         self.image_path_label.config(text=image_path)
 
         if os.path.exists(image_path):
@@ -70,7 +80,6 @@ class DrawingArea(object):
         self.canvas.bind("<Escape>", self.reset)
         self.canvas.bind("<Motion>", self.motion)
         self.canvas.bind("<ButtonPress-1>", self.Mousedown)
-        self.canvas.bind("<Delete>", self.remove_last_line)
 
     def reset(self, event):
         self.current = None
@@ -93,7 +102,7 @@ class DrawingArea(object):
             #Draw the final line
             event.widget.create_line(x0, y0, event.x, event.y)
 
-            self.lines[self.image_ind].append(Line(x0, y0, event.x, event.y))
+            self.lines[self.get_image_name()].append(Line(x0, y0, event.x, event.y))
             print ("Creating line: {0}, {1}, {2}, {3}".format(x0, y0, event.x, event.y))
             self.print_lines()
             self.current = None
@@ -116,26 +125,26 @@ class DrawingArea(object):
 
     def prev_image(self, event=None):
         self.save_lines()
-        if self.image_ind > 0:
+        if self.image_ind > self.min_image_ind:
             self.image_ind -= 1
-        self.load_image()
+            self.load_image()
 
     def print_lines(self):
         print("For image: {0}".format(self.image_ind))
-        for l in self.lines[self.image_ind]:
+        for l in self.lines[self.get_image_name()]:
             print(l)
         print("\n")
 
     def draw_lines(self):
         print("Drawing Lines Saved")
-        if self.image_ind in self.lines.keys():
-            for l in self.lines[self.image_ind]:
+        if self.get_image_name() in self.lines.keys():
+            for l in self.lines[self.get_image_name()]:
                 self.canvas.create_line(l.get_coords(), fill="red")
         else:
-            self.lines[self.image_ind] = []
+            self.lines[self.get_image_name()] = []
 
-        if self.image_ind not in self.line_buffer.keys():
-            self.line_buffer[self.image_ind] = []
+        if self.get_image_name() not in self.line_buffer.keys():
+            self.line_buffer[self.get_image_name()] = []
 
     def save_lines(self, line_filename="lines"):
         print("Saving Lines")
@@ -151,15 +160,57 @@ class DrawingArea(object):
 
     def remove_last_line(self, event=None):
         print("Removing Last Line")
-        if len(self.lines[self.image_ind]) > 0:
-            last_line = self.lines[self.image_ind].pop()
-            self.line_buffer[self.image_ind].append(last_line)
+        if len(self.lines[self.get_image_name()]) > 0:
+            last_line = self.lines[self.get_image_name()].pop()
+            self.line_buffer[self.get_image_name()].append(last_line)
+            self.save_lines()
+        self.load_image()
+
+    def undo_remove_line(self, event=None):
+        if len(self.line_buffer[self.get_image_name()]) > 0:
+            new_line = self.line_buffer[self.get_image_name()].pop()
+            self.lines[self.get_image_name()].append(new_line)
             self.save_lines()
             self.load_image()
 
-    def undo_remove_line(self, event=None):
-        if len(self.line_buffer[self.image_ind]) > 0:
-            new_line = self.line_buffer[self.image_ind].pop()
-            self.lines[self.image_ind].append(new_line)
-            self.save_lines()
-            self.load_image()
+    def get_image_name(self, image_ind=None, path=False):
+        if image_ind is None:
+            image_ind = self.image_ind
+        if path:
+            if self.bottom == False:
+                return "imgs/plaatje"+str(image_ind)+".jpg"
+            else:
+                return "imgs/plaatjeBOTTOM"+str(image_ind)+".jpg"
+        else:
+            if self.bottom == False:
+                return "plaatje"+str(image_ind)
+            else:
+                return "plaatjeBOTTOM"+str(image_ind)
+
+    def update_bottom(self):
+        self.bottom = (not self.bottom)
+        self.load_image()
+
+
+    def save_to_csv(self):
+        for image in self.lines.keys():
+            print("Saving Lines for Image: {0}".format(image))
+            img_file = 'labels/' + str(image) + '.csv'
+            with open(img_file, 'w') as csvfile:
+                img_writer = csv.writer(csvfile, delimiter=',', quoting=csv.QUOTE_MINIMAL)
+                for line in self.lines[image]:
+                    img_writer.writerow(line.get_coords_arr())
+
+    def load_lines_from_csv(self):
+        print("Loading Lines from CSVs")
+        os.chdir("labels/")
+        csv_files = [i for i in glob.glob('*.{}'.format('csv'))]
+        for csv_file in csv_files:
+            with open(csv_file, 'r') as csvfile:
+                csv_reader = csv.reader(csvfile, delimiter=',')
+                image_name = csv_file.split(".")[0]
+                self.lines[image_name] = []
+                for row in csv_reader:
+                    self.lines[image_name].append(Line(int(row[0]), int(row[1]), int(row[2]), int(row[3])))
+        os.chdir("../")
+        self.save_lines()

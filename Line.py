@@ -1,16 +1,25 @@
+#Author: Gautier Dagan
 
 class Point(object):
-    """docstring for Point - coordinate."""
+    """Class for Point - coordinate."""
     def __init__(self, x, y):
         super(Point, self).__init__()
-        self.x = x
-        self.y = y
+        if x > 640:
+            self.x = 640 #these values are fixed based on the height and width of all our images
+        else:
+            self.x = x
+
+        if y > 480:
+            self.y = 480
+        else:
+            self.y = y
+
     def __str__(self):
         return "("+str(self.x)+","+str(self.y)+")"
 
 
 class Line(object):
-    """docstring for Line."""
+    """class for Line."""
     def __init__(self, x0, y0, x1, y1):
         super(Line, self).__init__()
         self.point0 = Point(x0, y0)

@@ -1,3 +1,5 @@
+#Author: Gautier Dagan
+
 from tkinter import *
 import glob
 import csv
@@ -8,7 +10,10 @@ import copy
 import os
 
 class DrawingArea(object):
-    """docstring for DrawingArea."""
+    """
+    DrawingArea class where the bulk of the tkinter application is contained
+
+    """
     def __init__(self, root, image_ind=0, max_image_ind=5):
         super(DrawingArea, self).__init__()
         self.current = None

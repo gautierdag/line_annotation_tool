@@ -1,3 +1,5 @@
+#Author: Gautier Dagan
+
 from tkinter import *
 from DrawingArea import DrawingArea
 
